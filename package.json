@@ -6,6 +6,7 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "archiver": "^6.0.1",
     "express": "^4.18.3",
     "mime-types": "^2.1.35"
   }
