@@ -1,48 +1,42 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
+
 const app = express();
+const VIDEO_PATH = path.join(__dirname, "video", "ost_season_40_bs.mp4");
 
-const PORT = process.env.PORT || 3000;
-
-// Page d'accueil (optionnelle)
-app.get("/", (req, res) => {
-    res.send(`
-        <h1>Serveur vidéo streamé</h1>
-        <video controls autoplay width="640">
-            <source src="/video" type="video/mp4">
-        </video>
-    `);
-});
-
-// Streaming en chunks
 app.get("/video", (req, res) => {
-    const videoPath = path.join(__dirname, "Background.mp4");
-    const videoSize = fs.statSync(videoPath).size;
-
     const range = req.headers.range;
+    const videoSize = fs.statSync(VIDEO_PATH).size;
+
+    // --- CAS 1 : le header Range est absent (ex: Scratch/Turbowarp) ---
     if (!range) {
-        res.status(400).send("Requires Range header");
+        res.writeHead(200, {
+            "Content-Type": "video/mp4",
+            "Content-Length": videoSize
+        });
+        fs.createReadStream(VIDEO_PATH).pipe(res);
         return;
     }
 
-    const chunkSize = 1_000_000; // 1MB chunk
+    // --- CAS 2 : le header Range existe (navigateur normal) ---
+    const CHUNK_SIZE = 10 ** 6; // 1MB
     const start = Number(range.replace(/\D/g, ""));
-    const end = Math.min(start + chunkSize, videoSize - 1);
+    const end = Math.min(start + CHUNK_SIZE, videoSize - 1);
 
-    const headers = {
+    const contentLength = end - start + 1;
+
+    res.writeHead(206, {
         "Content-Range": `bytes ${start}-${end}/${videoSize}`,
         "Accept-Ranges": "bytes",
-        "Content-Length": end - start + 1,
-        "Content-Type": "video/mp4",
-    };
+        "Content-Length": contentLength,
+        "Content-Type": "video/mp4"
+    });
 
-    res.writeHead(206, headers);
-
-    const stream = fs.createReadStream(videoPath, { start, end });
-    stream.pipe(res);
+    fs.createReadStream(VIDEO_PATH, { start, end }).pipe(res);
 });
 
-app.listen(PORT, () => {
-    console.log("Server running on port " + PORT);
+// Render utilise automatiquement PORT
+app.listen(process.env.PORT || 3000, () => {
+    console.log("Server running");
 });
