@@ -1,72 +1,56 @@
-const express = require('express');
-const fs = require('fs');
-const path = require('path');
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Permet de retrouver le chemin du dossier actuel (nécessaire avec "type": "module")
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Charger les variables d'environnement depuis .env
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// -------- CONFIG DES DOSSIERS -------- //
-const VIDEO_DIR = path.join(__dirname, 'video');
-const IMG_DIR = path.join(__dirname, 'img');
+app.use(cors());
 
-// -------- MIDDLEWARE CORS -------- //
-app.use((req, res, next) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  next();
-});
-
-// -------- SERVEUR D’IMAGES -------- //
-// Exemple : /img/brawl_stars/shop.png
-app.get('/img/*', (req, res) => {
-  const filePath = path.join(IMG_DIR, req.params[0]);
-  
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).send("Image not found");
-  }
-
-  res.sendFile(filePath);
-});
-
-// -------- SERVEUR DE VIDÉOS (STREAMING) -------- //
-// Exemple : /video/brawl_stars/ost_season_40_bs.mp4
-app.get('/video/*', (req, res) => {
-  const filePath = path.join(VIDEO_DIR, req.params[0]);
-
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).send("Video not found");
-  }
-
-  const stat = fs.statSync(filePath);
-  const fileSize = stat.size;
-  const range = req.headers.range;
-
-  if (!range) {
-    return res.status(400).send("Requires Range header");
-  }
-
-  const parts = range.replace(/bytes=/, "").split("-");
-  const start = parseInt(parts[0], 10);
-  const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-
-  const chunkSize = end - start + 1;
-  const file = fs.createReadStream(filePath, { start, end });
-
-  res.writeHead(206, {
-    "Content-Range": `bytes ${start}-${end}/${fileSize}`,
-    "Accept-Ranges": "bytes",
-    "Content-Length": chunkSize,
-    "Content-Type": "video/mp4"
+// Endpoint principal : version + lien
+app.get("/version.json", (req, res) => {
+  res.json({
+    version: process.env.VERSION || "inconnu",
+    url: process.env.PROJECT_URL || null
   });
-
-  file.pipe(res);
 });
 
-// -------- ROUTE PRINCIPALE -------- //
-app.get('/', (req, res) => {
-  res.send("Server OK - vidéos & images disponibles ✔");
+// NOUVEAU : Endpoint pour télécharger des fichiers .txt
+app.get("/telecharger/:nomFichier", (req, res) => {
+  const fichier = req.params.nomFichier;
+
+  // Sécurité : on s'assure que l'utilisateur demande bien un fichier texte
+  if (!fichier.endsWith(".txt")) {
+    return res.status(400).send("Erreur : Seuls les fichiers .txt sont autorisés.");
+  }
+
+  // Chemin vers le dossier "fichiers" qui contiendra tes .txt
+  const cheminFichier = path.join(__dirname, "fichiers", fichier);
+
+  // Force le téléchargement
+  res.download(cheminFichier, fichier, (err) => {
+    if (err) {
+      console.error("Erreur lors du téléchargement :", err);
+      res.status(404).send("Fichier introuvable.");
+    }
+  });
 });
 
-// -------- DÉMARRAGE -------- //
+// Endpoint de test
+app.get("/", (req, res) => {
+  res.send("✅ Serveur actif - consultez /version.json pour voir la version et le lien");
+});
+
+// Lancer le serveur
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
 });
