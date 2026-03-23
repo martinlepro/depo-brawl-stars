@@ -22,33 +22,41 @@ app.get("/version.json", (req, res) => {
   });
 });
 
-// NOUVEAU : Endpoint pour télécharger des fichiers .txt
-app.get("/telecharger/:nomFichier", (req, res) => {
-  const fichier = req.params.nomFichier;
+// ✅ Images : /img/:dossier/:nomFichier
+app.get("/img/:dossier/:nomFichier", (req, res) => {
+  const { dossier, nomFichier } = req.params;
+  const cheminFichier = path.join(__dirname, "img", dossier, nomFichier);
 
-  if (!fichier.endsWith(".txt")) {
-    return res.status(400).send("Erreur : Seuls les fichiers .txt sont autorisés.");
-  }
-
-  const cheminFichier = path.join(__dirname, "fichiers", fichier);
-
-  res.download(cheminFichier, fichier, (err) => {
+  res.sendFile(cheminFichier, (err) => {
     if (err) {
-      console.error("Erreur lors du téléchargement :", err);
-      res.status(404).send("Fichier introuvable.");
+      console.error("Erreur image :", err);
+      res.status(404).send("Image introuvable.");
     }
   });
 });
 
-// ✅ AJOUT : Téléchargement depuis le dossier /txt
-app.get("/txt/:nomFichier", (req, res) => {
-  const fichier = req.params.nomFichier;
-  const cheminFichier = path.join(__dirname, "txt", fichier);
+// ✅ Vidéos : /video/:dossier/:nomFichier
+app.get("/video/:dossier/:nomFichier", (req, res) => {
+  const { dossier, nomFichier } = req.params;
+  const cheminFichier = path.join(__dirname, "video", dossier, nomFichier);
 
-  res.download(cheminFichier, fichier, (err) => {
+  res.sendFile(cheminFichier, (err) => {
     if (err) {
-      console.error("Erreur lors du téléchargement :", err);
-      res.status(404).send("Fichier introuvable.");
+      console.error("Erreur vidéo :", err);
+      res.status(404).send("Vidéo introuvable.");
+    }
+  });
+});
+
+// ✅ Textes : /txt/:dossier/:nomFichier
+app.get("/txt/:dossier/:nomFichier", (req, res) => {
+  const { dossier, nomFichier } = req.params;
+  const cheminFichier = path.join(__dirname, "txt", dossier, nomFichier);
+
+  res.download(cheminFichier, nomFichier, (err) => {
+    if (err) {
+      console.error("Erreur texte :", err);
+      res.status(404).send("Fichier texte introuvable.");
     }
   });
 });
@@ -61,3 +69,19 @@ app.get("/", (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
 });
+```
+
+**Structure de dossiers attendue sur GitHub :**
+```
+mon-projet/
+├── server.js
+├── package.json
+├── img/
+│   └── brawl_stars/
+│       └── image.png
+├── video/
+│   └── brawl_stars/
+│       └── troncon_1.mp4
+└── txt/
+    └── brawl_stars/
+        └── monfichier.txt
