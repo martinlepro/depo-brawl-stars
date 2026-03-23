@@ -1,87 +1,85 @@
-import express from "express";
-import dotenv from "dotenv";
-import cors from "cors";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config();
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// -------- CONFIG DES DOSSIERS -------- //
+const VIDEO_DIR = path.join(__dirname, 'video');
+const IMG_DIR = path.join(__dirname, 'img');
+const TXT_DIR = path.join(__dirname, 'txt'); // ✅ AJOUT
 
-// Endpoint principal : version + lien
-app.get("/version.json", (req, res) => {
-  res.json({
-    version: process.env.VERSION || "inconnu",
-    url: process.env.PROJECT_URL || null
+// -------- MIDDLEWARE CORS -------- //
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  next();
+});
+
+// -------- SERVEUR D'IMAGES -------- //
+// Exemple : /img/brawl_stars/shop.png
+app.get('/img/*', (req, res) => {
+  const filePath = path.join(IMG_DIR, req.params[0]);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send("Image not found");
+  }
+
+  res.sendFile(filePath);
+});
+
+// -------- SERVEUR DE VIDÉOS (STREAMING) -------- //
+// Exemple : /video/brawl_stars/ost_season_40_bs.mp4
+app.get('/video/*', (req, res) => {
+  const filePath = path.join(VIDEO_DIR, req.params[0]);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send("Video not found");
+  }
+
+  const stat = fs.statSync(filePath);
+  const fileSize = stat.size;
+  const range = req.headers.range;
+
+  if (!range) {
+    return res.status(400).send("Requires Range header");
+  }
+
+  const parts = range.replace(/bytes=/, "").split("-");
+  const start = parseInt(parts[0], 10);
+  const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+  const chunkSize = end - start + 1;
+  const file = fs.createReadStream(filePath, { start, end });
+
+  res.writeHead(206, {
+    "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+    "Accept-Ranges": "bytes",
+    "Content-Length": chunkSize,
+    "Content-Type": "video/mp4"
   });
+
+  file.pipe(res);
 });
 
-// ✅ Images : /img/:dossier/:nomFichier
-app.get("/img/:dossier/:nomFichier", (req, res) => {
-  const { dossier, nomFichier } = req.params;
-  const cheminFichier = path.join(__dirname, "img", dossier, nomFichier);
+// -------- SERVEUR DE FICHIERS TXT -------- // ✅ AJOUT
+// Exemple : /txt/brawl_stars/monfichier.txt
+app.get('/txt/*', (req, res) => {
+  const filePath = path.join(TXT_DIR, req.params[0]);
 
-  res.sendFile(cheminFichier, (err) => {
-    if (err) {
-      console.error("Erreur image :", err);
-      res.status(404).send("Image introuvable.");
-    }
-  });
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).send("File not found");
+  }
+
+  res.download(filePath);
 });
 
-// ✅ Vidéos : /video/:dossier/:nomFichier
-app.get("/video/:dossier/:nomFichier", (req, res) => {
-  const { dossier, nomFichier } = req.params;
-  const cheminFichier = path.join(__dirname, "video", dossier, nomFichier);
-
-  res.sendFile(cheminFichier, (err) => {
-    if (err) {
-      console.error("Erreur vidéo :", err);
-      res.status(404).send("Vidéo introuvable.");
-    }
-  });
+// -------- ROUTE PRINCIPALE -------- //
+app.get('/', (req, res) => {
+  res.send("Server OK - vidéos, images & fichiers txt disponibles ✔");
 });
 
-// ✅ Textes : /txt/:dossier/:nomFichier
-app.get("/txt/:dossier/:nomFichier", (req, res) => {
-  const { dossier, nomFichier } = req.params;
-  const cheminFichier = path.join(__dirname, "txt", dossier, nomFichier);
-
-  res.download(cheminFichier, nomFichier, (err) => {
-    if (err) {
-      console.error("Erreur texte :", err);
-      res.status(404).send("Fichier texte introuvable.");
-    }
-  });
-});
-
-// Endpoint de test
-app.get("/", (req, res) => {
-  res.send("✅ Serveur actif - consultez /version.json pour voir la version et le lien");
-});
-
+// -------- DÉMARRAGE -------- //
 app.listen(PORT, () => {
-  console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
-```
-
-**Structure de dossiers attendue sur GitHub :**
-```
-mon-projet/
-├── server.js
-├── package.json
-├── img/
-│   └── brawl_stars/
-│       └── image.png
-├── video/
-│   └── brawl_stars/
-│       └── troncon_1.mp4
-└── txt/
-    └── brawl_stars/
-        └── monfichier.txt
