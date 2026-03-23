@@ -4,53 +4,69 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 
-// Configuration pour récupérer le chemin du dossier actuel
+// Résolution du chemin du dossier courant (nécessaire avec ES Modules)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Charger les variables d'environnement (.env)
+// Charger les variables d'environnement depuis .env
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Autoriser Scratch à communiquer avec le serveur (CORS)
+// Autoriser les requêtes cross-origin (ex : Scratch, navigateur externe)
 app.use(cors());
 
-// --- FEATURE 1 : Gestion des versions ---
+// ─────────────────────────────────────────────
+// PAGE D'ACCUEIL
+// ─────────────────────────────────────────────
+app.get("/", (req, res) => {
+  res.send(`
+    <h1>✅ Serveur Actif</h1>
+    <ul>
+      <li><a href="/version.json">/version.json</a> — version et lien du projet</li>
+      <li><b>/telecharger/nom.txt</b> — télécharger un fichier .txt</li>
+    </ul>
+  `);
+});
+
+// ─────────────────────────────────────────────
+// FEATURE 1 : Informations de version
+// GET /version.json
+// ─────────────────────────────────────────────
 app.get("/version.json", (req, res) => {
   res.json({
     version: process.env.VERSION || "1.0.0",
-    url: process.env.PROJECT_URL || "https://scratch.mit.edu"
+    url: process.env.PROJECT_URL || "https://scratch.mit.edu",
   });
 });
 
-// --- FEATURE 2 : Téléchargement de fichiers .txt ---
-// Exemple d'utilisation : https://ton-url.com/telecharger/monfichier.txt
+// ─────────────────────────────────────────────
+// FEATURE 2 : Téléchargement de fichiers .txt
+// GET /telecharger/:nomFichier
+// Les fichiers doivent être placés dans le dossier "./fichiers/"
+// ─────────────────────────────────────────────
 app.get("/telecharger/:nomFichier", (req, res) => {
   const nomFichier = req.params.nomFichier;
 
-  // Sécurité : n'autoriser que les fichiers .txt
+  // Sécurité : uniquement les fichiers .txt
   if (!nomFichier.endsWith(".txt")) {
-    return res.status(400).send("Erreur : Seuls les fichiers .txt sont autorisés.");
+    return res.status(400).send("❌ Erreur : seuls les fichiers .txt sont autorisés.");
   }
 
-  // Chemin vers le dossier "fichiers"
   const cheminComplet = path.join(__dirname, "fichiers", nomFichier);
 
   res.download(cheminComplet, nomFichier, (err) => {
     if (err) {
-      console.error("Fichier non trouvé :", nomFichier);
-      res.status(404).send("Le fichier demandé n'existe pas sur le serveur.");
+      console.error(`Fichier introuvable : ${nomFichier}`);
+      res.status(404).send("❌ Le fichier demandé n'existe pas sur le serveur.");
     }
   });
 });
 
-// Page d'accueil par défaut
-app.get("/", (req, res) => {
-  res.send("<h1>✅ Serveur Actif</h1><p>Utilisez <b>/version.json</b> pour la version ou <b>/telecharger/nom.txt</b> pour les fichiers.</p>");
-});
-
+// ─────────────────────────────────────────────
+// DÉMARRAGE
+// ─────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+  console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
 });
